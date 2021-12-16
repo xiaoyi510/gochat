@@ -158,6 +158,7 @@
         .chat-user-list .me{
             color: crimson;
         }
+
     </style>
 </head>
 <body>
@@ -241,6 +242,7 @@
         $('#btn-send').click(function (){
             ws.send("send|_|"+name+"|_|"+$('#send-content').val())
             $('#send-content').val("")
+            $('#send-content').focus()
         });
 
 
