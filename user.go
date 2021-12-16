@@ -94,12 +94,15 @@ func (this *User) Online() {
 // 检测用户状态
 func (this *User) checkStatus() {
 
-	for this.lastAcTime >= time.Now().Unix()-60 {
-		time.Sleep(time.Second * 1)
-	}
-	err := this.conn.Close()
-	if err != nil {
-		return
+	for {
+		if this.lastAcTime >= time.Now().Unix()-60 {
+			time.Sleep(time.Second * 1)
+		} else {
+			err := this.conn.Close()
+			if err != nil {
+				return
+			}
+		}
 	}
 }
 
