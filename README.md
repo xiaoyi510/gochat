@@ -1,2 +1,5 @@
 # gochat
-golang 聊天室
+golang websocket 简易聊天室
+
+### 预览
+![img.png](img.png)
