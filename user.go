@@ -7,19 +7,21 @@ import (
 )
 
 type User struct {
-	name   string
-	conn   *websocket.Conn
-	C      chan string
-	server *Server
+	name       string
+	conn       *websocket.Conn
+	C          chan string
+	server     *Server
+	lastAcTime int64
 }
 
 //NewUser 新建用户
 func NewUser(name string, ws *websocket.Conn, server *Server) *User {
 	user := &User{
-		name:   name,
-		conn:   ws,
-		C:      make(chan string),
-		server: server,
+		name:       name,
+		conn:       ws,
+		C:          make(chan string),
+		server:     server,
+		lastAcTime: time.Now().Unix(),
 	}
 	go user.listenChan()
 	return user
@@ -85,6 +87,20 @@ func (this *User) Online() {
 	this.server.UserMapLock.Unlock()
 	//>> 1 状态  2 用户名  3 信息
 	this.server.Broadcast(this.getTipText(TIP_TYPE_USER_ONLINE, "欢迎["+this.name+"]加入聊天室"))
+
+	go this.checkStatus()
+}
+
+// 检测用户状态
+func (this *User) checkStatus() {
+
+	for this.lastAcTime >= time.Now().Unix()-60 {
+		time.Sleep(time.Second * 1)
+	}
+	err := this.conn.Close()
+	if err != nil {
+		return
+	}
 }
 
 // 修改用户名
@@ -129,5 +145,10 @@ func (this *User) getTipText(tipType string, msg string) string {
 
 // OffLine 用户下线
 func (this *User) OffLine() {
+	delete(this.server.UserMap, this.name)
 	this.server.Broadcast(this.getTipText(TIP_TYPE_USER_OFFLINE, "用户["+this.name+"]离开了"))
+	err := this.conn.Close()
+	if err != nil {
+		return
+	}
 }

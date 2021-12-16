@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 )
 
 type Server struct {
@@ -62,17 +63,22 @@ func (this *Server) handle(c *gin.Context) {
 	if err != nil {
 		return
 	}
+
+	// 当前用户信息
 	var user *User
+
+	// 端口连接后处理
 	defer func() {
 		if user != nil && len(user.name) > 0 {
-			delete(this.UserMap, user.name)
 			user.OffLine()
-		}
-		err := ws.Close()
-		if err != nil {
-			return
+		} else {
+			err := ws.Close()
+			if err != nil {
+				return
+			}
 		}
 	}()
+
 	for {
 		//读取ws中的数据
 		_, message, err := ws.ReadMessage()
@@ -89,6 +95,10 @@ func (this *Server) handle(c *gin.Context) {
 			continue
 		}
 
+		if user != nil {
+			user.lastAcTime = time.Now().Unix()
+		}
+
 		switch messageArr[0] {
 		case "init":
 			if _, ok := this.UserMap[messageArr[1]]; ok {
@@ -100,6 +110,7 @@ func (this *Server) handle(c *gin.Context) {
 			// 处理用户上线
 			user.Online()
 			// 记录当前协程用户名
+
 			break
 		default:
 			if user != nil {
