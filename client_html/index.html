@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>聊天室</title>
+    <script src="http://code.jquery.com/jquery-1.10.2.min.js"></script>
+
+    <style>
+        *{
+            padding: 0;
+            margin: 0;
+            font-family: "微软雅黑", serif;
+            font-size: 12px;
+        }
+        head,html,body{
+            height: 100%;
+        }
+        hr{
+            border: 1px dashed #efefef;
+        }
+        body{
+            display:flex;
+        }
+        .chat{
+            width: 800px;
+            height: 500px;
+            margin: 0 auto;
+            align-self: center;
+            /*border: 1px solid #606060;*/
+            box-shadow:1px 1px 4px 0px #e1e1e1;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .chat-title{
+            color: white;
+            height: 30px;
+            background-color: crimson;
+            padding: 6px 0 0 6px;
+            width: calc(100% - 6px);
+        }
+        .chat-title p{
+            margin: 0 auto;
+            font-size: 15px;
+            width: fit-content;
+        }
+        .chat-win{
+            height: 100%;
+            background-color: #fbfbfb;
+
+        }
+
+        .chat-content{
+            float: left;
+            width: 620px;
+            height: calc(100%  - 36px );
+        }
+        .chat-list{
+            width: 100%;
+            height: calc(100% - 64px);
+            overflow: auto;
+        }
+        #btn-send{
+            height: 100%;
+        }
+        #send-content:focus{
+        }
+        #send-content{
+            float: left;
+            width: 548px;
+            outline: none;
+            resize: none;
+            padding: 6px;
+            height: 50px;
+            border: none;
+        }
+        #btn-send{
+            outline: none;
+            float: right;
+            height: 63px;
+            border: none;
+            background-color: crimson;
+            color: white;
+            cursor: pointer;
+            padding: 0 6px;
+        }
+        #btn-send:hover{
+            background-color: #e32a4f;
+        }
+        #btn-send:active{
+            background-color: #c1193b;
+        }
+
+        .chat-user-list{
+            float: left;
+            width: 179px;
+            height: calc(100%  - 36px );
+            border-left: 1px solid #ccc;
+        }
+        .chat-user-list ul li{
+            list-style: none;
+            /*float: left;*/
+            padding: 3px 10px;
+        }
+
+        .chat-list ul {
+            padding: 3px;
+
+        }
+        .chat-list ul li .time{
+            /*border: 1px solid #666;*/
+            margin: 0 auto;
+            width: fit-content;
+            border-radius: 3px;
+            background-color: #d9d9d9;
+            color: white;
+            padding: 0 6px;
+            font-size: 12px;
+            text-align: center;
+        }
+        .chat-list ul li .user{
+            margin: 3px 6px 0;
+            font-size: 12px;
+            color: #bdbdbd;
+        }
+
+        .chat-list ul .tip{
+            margin: 0 auto ;
+            text-align: center;
+        }
+        .chat-list ul li{
+            float: left;
+            width: 100%;
+            padding-bottom: 3px;
+        }
+        .chat-list ul li .context{
+            width: 100%;
+        }
+        .chat-list ul li .context span{
+            border-radius: 3px;
+            background-color: #ececec;
+            margin: 3px 6px 0;
+            padding: 6px;
+            display: inline-block;
+            font-size: 13px;
+        }
+        .chat-list ul .my{
+            height: auto;
+        }
+        .chat-list ul .my .context span{
+            float: right;
+            background-color: cornflowerblue;
+            color: white;
+        }
+
+        .chat-user-list li{
+            cursor: pointer;
+        }
+        .chat-user-list .me{
+            color: crimson;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat">
+        <div class="chat-title">
+            <p>聊天室</p>
+        </div>
+        <div class="chat-win">
+            <div class="chat-content">
+                <div class="chat-list">
+                    <ul>
+                    </ul>
+                </div>
+                <hr>
+                <div class="send">
+                    <textarea name="send-content" id="send-content" cols="30" rows="10" placeholder="请输入发送内容" ></textarea>
+                    <button id="btn-send" type="button">发送消息</button>
+                </div>
+            </div>
+            <div class="chat-user-list">
+                <ul >
+
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+<script>
+    $(function(){
+        console.log("开始工作");
+
+        do {
+            var name = prompt("请输入您的名称");
+            if(name != null){
+                name = name.trim();
+            }
+        }while (name == null || name.length == 0);
+
+        var ws = new WebSocket('ws://127.0.0.1:8899/websocket');
+        ws.onopen = function () {
+            ws.send('init|_|'+name);
+        };
+        ws.onclose = function (){
+            window.location.reload();
+        }
+        ws.onmessage = function (e) {
+            console.log('from server: ' + e.data);
+            var eArr = e.data.split("|-|")
+            if (eArr.length > 1){
+                //>> 判断类型
+                switch (eArr[0]){
+                    case "list":
+                        //>> 这个里面都是用户名列表
+                        var arrs = eArr[1].split("|")
+
+                        arrs.forEach(function (username){
+                            if(username == name){
+                                return username;
+                            }
+                            $('.chat-user-list ul').append("<li data-name='"+username+"'>"+username+"</li>")
+
+                        })
+
+                        break;
+                    case "tip":
+                        // 1 状态  2 用户名  3 信息
+                        receiveTip(eArr[1],eArr[2],eArr[3]);
+                        break;
+                    case "msg":
+                        //>> 输出
+                        receiveMsg(eArr[1],eArr[2],eArr[3])
+                        break;
+                }
+                var scrollHeight = $('.chat-list').prop("scrollHeight");
+                $('.chat-list').scrollTop(scrollHeight,200);
+
+            }
+
+        };
+
+        $('#btn-send').click(function (){
+            ws.send("send|_|"+name+"|_|"+$('#send-content').val())
+            $('#send-content').val("")
+        });
+
+
+        /**
+         * 接受消息
+         * @param username
+         * @param time
+         * @param msg
+         */
+        function receiveMsg(username,time,msg){
+            let isNotMe = 1;
+            if(username === name){
+                //>> 插入为自己消息
+                isNotMe = 0
+            }
+
+            $('.chat-list ul').append("<li class=\""+(isNotMe?"":"my")+"\">\n" +
+                "                            <p class=\"time\">"+time+"</p>\n" +
+                (isNotMe?"<p class=\"user\">"+username+"</p>":"")+
+                "                            <p class=\"context\"><span>"+msg+"</span></p>\n" +
+                "                        </li>")
+        }
+        // 1 状态  2 用户名  3 信息
+        function receiveTip(type,username,msg){
+            switch (parseInt(type)){
+                case 1:
+                    //>> 判断是否为自己
+                    let isNotMe = 1;
+                    if (username == name){
+                        isNotMe = 0;
+                    }
+                    if ($('.chat-user-list ul li[data-name="'+username+'"]').length>0){
+                        $('.chat-user-list ul li[data-name="'+username+'"]').remove();
+                    }
+                    if (isNotMe == 1){
+                        $('.chat-user-list ul').append("<li data-name='"+username+"'>"+username+"</li>")
+                    }else{
+                        $('.chat-user-list ul').append("<li data-name='"+username+"' class='me'>"+username+"</li>")
+                    }
+                    $('.chat-list ul').append("<li class=\"tip\">\n" +
+                        "                            <p class=\"time\">"+msg+"</p>\n" +
+                        "                        </li>")
+                    if(name == username){
+                        ws.send("list|_|"+name);
+                        console.log("list|_|"+name)
+                    }
+                    break;
+                    case 2:
+                        //>> 删除用户名
+                        $('.chat-user-list ul li[data-name="'+username+'"]').remove()
+                        $('.chat-list ul').append("<li class=\"tip\">\n" +
+                            "                            <p class=\"time\">"+msg+"</p>\n" +
+                            "                        </li>")
+                        break;
+                    case 3:
+                        $('.chat-user-list ul li[data-name="'+username+'"]').remove()
+                        $('.chat-list ul').append("<li class=\"tip\">\n" +
+                            "                            <p class=\"time\">"+msg+"</p>\n" +
+                            "                        </li>")
+                        alert(msg)
+                        break;
+            }
+
+
+        }
+
+    })
+</script>
+</html>
