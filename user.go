@@ -45,25 +45,36 @@ func (this *User) OnMessage(messageArr []string) {
 
 	switch messageArr[0] {
 	case "list":
-		//>> 获取列表
-		arr := ""
-		this.server.UserMapLock.RLock()
-		for _, user := range this.server.UserMap {
-			arr = arr + user.name + "|"
-		}
-		this.server.UserMapLock.RUnlock()
-		this.server.UserMap[messageArr[1]].Send("list|-|" + arr)
+		this.onList()
+		break
+	case "set-username":
+		this.onSetUsername(messageArr[2])
 		break
 	case "send":
 		//>> 发送消息 1 username 2 time 3 msg
 		if len(messageArr[2]) > 0 {
-			t := time.Now()
-			tStr := fmt.Sprintf("%02d:%02d:%02d", t.Hour(), t.Minute(), t.Second())
-			this.server.Broadcast("msg|-|" + messageArr[1] + "|-|" + tStr + "|-|" + messageArr[2] + "")
+			this.onSend(messageArr[1], messageArr[2])
 		}
-
 		break
 	}
+}
+
+func (this *User) onList() {
+	//>> 获取用户列表
+	arr := ""
+	this.server.UserMapLock.RLock()
+	for _, user := range this.server.UserMap {
+		arr = arr + user.name + "|"
+	}
+	this.server.UserMapLock.RUnlock()
+	this.server.UserMap[this.name].Send("list|-|" + arr)
+}
+
+// 发送消息
+func (this *User) onSend(username string, msg string) {
+	t := time.Now()
+	tStr := fmt.Sprintf("%02d:%02d:%02d", t.Hour(), t.Minute(), t.Second())
+	this.server.Broadcast("msg|-|" + username + "|-|" + tStr + "|-|" + msg + "")
 }
 
 func (this *User) Online() {
@@ -73,5 +84,50 @@ func (this *User) Online() {
 	this.server.UserMap[this.name] = this
 	this.server.UserMapLock.Unlock()
 	//>> 1 状态  2 用户名  3 信息
-	this.server.Broadcast("tip|-|1|-|" + this.name + "|-|欢迎[" + this.name + "]上线")
+	this.server.Broadcast(this.getTipText(TIP_TYPE_USER_ONLINE, "欢迎["+this.name+"]加入聊天室"))
+}
+
+// 修改用户名
+func (this *User) onSetUsername(newUsername string) {
+	// 删除关系
+
+	// 修改到用户映射关系中
+	if _, ok := this.server.UserMap[newUsername]; ok {
+		//>> 已有用户存在
+		this.SendTip(TIP_TYPE_ERROR_NORMAL, "用户名["+newUsername+"]已存在")
+		return
+	}
+	// 记录老用户名
+	oldName := this.name
+
+	this.server.UserMapLock.Lock()
+	this.server.UserMap[newUsername] = this
+	this.server.UserMapLock.Unlock()
+	delete(this.server.UserMap, oldName)
+
+	// 修改为新用户名
+	this.name = newUsername
+
+	// 通知客户端用户已修改用户名
+	this.topSetUsernameTip(oldName)
+}
+
+// 发送用户修改用户名成功
+func (this *User) topSetUsernameTip(oldUsername string) {
+	this.server.Broadcast(this.getTipText(TIP_TYPE_USER_SET_USERNAME, oldUsername))
+
+}
+
+// SendTip 发送公告
+func (this *User) SendTip(tipType string, msg string) {
+	this.Send(this.getTipText(tipType, msg))
+}
+
+func (this *User) getTipText(tipType string, msg string) string {
+	return "tip|-|" + tipType + "|-|" + this.name + "|-|" + msg
+}
+
+// OffLine 用户下线
+func (this *User) OffLine() {
+	this.server.Broadcast(this.getTipText(TIP_TYPE_USER_OFFLINE, "用户["+this.name+"]离开了"))
 }

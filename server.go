@@ -40,7 +40,6 @@ func (this *Server) Start() {
 	r := gin.Default()
 	go this.listenMsgChan()
 
-
 	// 指明html加载文件目录
 	r.LoadHTMLGlob("./client_html/*")
 	r.Handle("GET", "/", func(context *gin.Context) {
@@ -50,7 +49,6 @@ func (this *Server) Start() {
 
 	// 监听Get请求
 	r.GET("/websocket", this.handle)
-
 
 	r.Run(fmt.Sprintf("%s:%d", this.Ip, this.Port))
 
@@ -64,11 +62,11 @@ func (this *Server) handle(c *gin.Context) {
 	if err != nil {
 		return
 	}
-	name := ""
+	var user *User
 	defer func() {
-		if len(name) > 0 {
-			delete(this.UserMap, name)
-			this.Broadcast("tip|-|2|-|" + name + "|-|用户[" + name + "]离开了")
+		if user != nil && len(user.name) > 0 {
+			delete(this.UserMap, user.name)
+			user.OffLine()
 		}
 		err := ws.Close()
 		if err != nil {
@@ -94,18 +92,21 @@ func (this *Server) handle(c *gin.Context) {
 		switch messageArr[0] {
 		case "init":
 			if _, ok := this.UserMap[messageArr[1]]; ok {
-				ws.WriteMessage(websocket.TextMessage, []byte("tip|-|3|-|"+messageArr[1]+"|-|用户已登录请切换其他账号"))
+				ws.WriteMessage(websocket.TextMessage, []byte("tip|-|"+TIP_TYPE_ERROR+"|-|"+messageArr[1]+"|-|用户已登录请切换其他账号"))
 				return
 			}
-			user := NewUser(messageArr[1], ws,this)
+			// 创建用户
+			user = NewUser(messageArr[1], ws, this)
+			// 处理用户上线
 			user.Online()
-			name = user.name
+			// 记录当前协程用户名
 			break
 		default:
-			if len(name)>0 {
-				this.UserMap[name].OnMessage(messageArr)
-			}else {
-				ws.WriteMessage(websocket.TextMessage,[]byte("tip|-|3|-|1|-|请先登录"))
+			if user != nil {
+				user.OnMessage(messageArr)
+			} else {
+				ws.WriteMessage(websocket.TextMessage, []byte("tip|-|"+TIP_TYPE_ERROR+"|-|1|-|请先登录"))
+				return
 			}
 		}
 
